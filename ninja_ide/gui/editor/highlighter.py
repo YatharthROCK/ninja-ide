@@ -19,17 +19,19 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import re
+
 from PyQt4.QtGui import QColor
 from PyQt4.QtGui import QTextCharFormat
 from PyQt4.QtGui import QFont
 from PyQt4.QtGui import QSyntaxHighlighter
-from PyQt4.QtGui import QTextBlockUserData
 from PyQt4.QtCore import QThread
 from PyQt4.QtCore import QRegExp
 from PyQt4.QtCore import SIGNAL
 
 from ninja_ide import resources
 from ninja_ide.core import settings
+from ninja_ide.gui.editor import syntax_highlighter
 
 
 def format(color, style=''):
@@ -76,30 +78,6 @@ def restyle(scheme):
             STYLES[stkw] = format(scheme.get(srkw, rescs[srkw]), default)
         else:
             STYLES[stkw] = format(scheme.get(srkw, rescs[srkw]))
-
-
-class SyntaxUserData(QTextBlockUserData):
-    """Store the information of the errors, str and comments for each block."""
-
-    def __init__(self, error=False):
-        super(SyntaxUserData, self).__init__()
-        self.error = error
-        self.str_groups = []
-        self.comment_start = -1
-
-    def clear_data(self):
-        """Clear the data stored for the current block."""
-        self.error = False
-        self.str_groups = []
-        self.comment_start = -1
-
-    def add_str_group(self, start, end):
-        """Add a pair of values setting the beggining and end of a string."""
-        self.str_groups.append((start + 1, end))
-
-    def comment_start_at(self, pos):
-        """Set the position in the line where the comment starts."""
-        self.comment_start = pos
 
 
 class Highlighter(QSyntaxHighlighter):
@@ -209,8 +187,10 @@ class Highlighter(QSyntaxHighlighter):
 
         multi = langSyntax.get('multiline_comment', [])
         if multi:
-            self.multi_start = (QRegExp(multi['open']), STYLES['comment'])
-            self.multi_end = (QRegExp(multi['close']), STYLES['comment'])
+            self.multi_start = (QRegExp(
+                re.escape(multi['open'])), STYLES['comment'])
+            self.multi_end = (QRegExp(
+                re.escape(multi['close'])), STYLES['comment'])
         else:
             self.multi_start = None
 
@@ -304,6 +284,7 @@ class Highlighter(QSyntaxHighlighter):
         else:
             self._styles = {}
         self.highlight_function = self.realtime_highlight
+        self.thread_highlight.wait()
 
     def threaded_highlight(self, text):
         """Highlight each line using the info collected by the thread.
@@ -314,9 +295,7 @@ class Highlighter(QSyntaxHighlighter):
         info returned from the thread and applied that to the document."""
         hls = []
         block = self.currentBlock()
-        user_data = block.userData()
-        if user_data is None:
-            user_data = SyntaxUserData(False)
+        user_data = syntax_highlighter.get_user_data(block)
         user_data.clear_data()
         block_number = block.blockNumber()
         highlight_errors = lambda cf, ud: cf
@@ -368,9 +347,7 @@ class Highlighter(QSyntaxHighlighter):
         time to highlight all the lines together."""
         hls = []
         block = self.currentBlock()
-        user_data = block.userData()
-        if user_data is None:
-            user_data = SyntaxUserData(False)
+        user_data = syntax_highlighter.get_user_data(block)
         user_data.clear_data()
         block_number = block.blockNumber()
         highlight_errors = lambda cf, ud: cf
@@ -459,8 +436,8 @@ class Highlighter(QSyntaxHighlighter):
         errors_lines = []
         block = self.document().begin()
         while block.isValid():
-            user_data = block.userData()
-            if (user_data is not None) and (user_data.error):
+            user_data = syntax_highlighter.get_user_data(block)
+            if user_data.error:
                 errors_lines.append(block.blockNumber())
             block = block.next()
         return errors_lines
@@ -514,8 +491,7 @@ class Highlighter(QSyntaxHighlighter):
                ((st_fmt == STYLES['comment']) and
                (self.previousBlockState() != 0))) and \
                 (len(start_collides) == 0):
-                if user_data is not None:
-                    style = highlight_errors(style, user_data)
+                style = highlight_errors(style, user_data)
                 self.setFormat(start, length, style)
             else:
                 self.setCurrentBlockState(0)

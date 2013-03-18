@@ -167,11 +167,14 @@ class SidebarWidget(QWidget):
 
     def _find_fold_closing_brace(self, block):
         block = block.next()
+        openBrace = 1
         while block.isValid():
-            openBrace = block.text().count('{')
-            closeBrace = block.text().count('}') - openBrace
-            if closeBrace > 0:
+            openBrace += block.text().count('{')
+            openBrace -= block.text().count('}')
+            if openBrace == 0:
                 return block.blockNumber() + 1
+            elif openBrace < 0:
+                return block.blockNumber()
             block = block.next()
         return block.blockNumber()
 

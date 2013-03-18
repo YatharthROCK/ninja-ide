@@ -39,6 +39,14 @@ except NameError:
     basestring = unicode = str  # lint:ok
 
 
+def get_user_data(block):
+    user_data = block.userData()
+    if user_data is None or not isinstance(user_data, SyntaxUserData):
+        user_data = SyntaxUserData()
+
+    return user_data
+
+
 class SyntaxUserData(QTextBlockUserData):
     """Store the information of the errors, str and comments for each block."""
 
@@ -370,9 +378,7 @@ class SyntaxHighlighter(QSyntaxHighlighter):
         new_state = previous_state
         # User data and errors
         block = self.currentBlock()
-        user_data = block.userData()
-        if user_data is None:
-            user_data = SyntaxUserData(False)
+        user_data = get_user_data(block)
         user_data.clear_data()
         valid_error_line, highlight_errors = self.get_error_highlighter(block)
         # speed-up name-lookups
@@ -449,8 +455,8 @@ class SyntaxHighlighter(QSyntaxHighlighter):
         errors_lines = []
         block = self.document().begin()
         while block.isValid():
-            user_data = block.userData()
-            if (user_data is not None) and (user_data.error):
+            user_data = get_user_data(block)
+            if user_data.error:
                 errors_lines.append(block.blockNumber())
             block = block.next()
         return errors_lines
@@ -465,8 +471,39 @@ class SyntaxHighlighter(QSyntaxHighlighter):
         self._rehighlight_lines(refresh_lines)
 
 
-def load_syntax(syntax, context=None):
-    context = context or {}
+def _create_scheme():
+    scheme = {
+      "syntax_comment": dict(color=resources.CUSTOM_SCHEME.get(
+          "comment", resources.COLOR_SCHEME["comment"]), italic=True),
+      "syntax_string": resources.CUSTOM_SCHEME.get(
+          "string", resources.COLOR_SCHEME["string"]),
+      "syntax_builtin": resources.CUSTOM_SCHEME.get(
+          "extras", resources.COLOR_SCHEME["extras"]),
+      "syntax_keyword": (resources.CUSTOM_SCHEME.get(
+          "keyword", resources.COLOR_SCHEME["keyword"]), True),
+      "syntax_definition": (resources.CUSTOM_SCHEME.get(
+          "definition", resources.COLOR_SCHEME["definition"]), True),
+      "syntax_braces": resources.CUSTOM_SCHEME.get(
+          "brace", resources.COLOR_SCHEME["brace"]),
+      "syntax_number": resources.CUSTOM_SCHEME.get(
+          "numbers", resources.COLOR_SCHEME["numbers"]),
+      "syntax_proper_object": resources.CUSTOM_SCHEME.get(
+          "properObject", resources.COLOR_SCHEME["properObject"]),
+      "syntax_operators": resources.CUSTOM_SCHEME.get(
+          "operator", resources.COLOR_SCHEME["operator"]),
+      "syntax_highlight_word": dict(color=resources.CUSTOM_SCHEME.get(
+          "selected-word", resources.COLOR_SCHEME["selected-word"]),
+          background=resources.CUSTOM_SCHEME.get(
+          "selected-word-background",
+          resources.COLOR_SCHEME["selected-word-background"])),
+      "syntax_pending": resources.COLOR_SCHEME["pending"],
+    }
+
+    return scheme
+
+
+def load_syntax(syntax):
+    context = _create_scheme() or {}
 
     partition_scanner = PartitionScanner(syntax.get("partitions", []))
 

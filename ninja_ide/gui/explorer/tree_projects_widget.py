@@ -67,6 +67,7 @@ class TreeProjectsWidget(QTreeWidget):
     closeFilesFromProjectClosed(QString)
     addProjectToConsole(QString)
     removeProjectFromConsole(QString)
+    projectPropertiesUpdated(QTreeWidgetItem)
     """
 
 ###############################################################################
@@ -109,8 +110,13 @@ class TreeProjectsWidget(QTreeWidget):
         self.connect(self, SIGNAL(
             "customContextMenuRequested(const QPoint &)"),
             self._menu_context_tree)
-        self.connect(self, SIGNAL("itemClicked(QTreeWidgetItem *, int)"),
-            self._open_file)
+
+        signal_name = "itemClicked(QTreeWidgetItem *, int)"
+        # For windows double click instead of single click
+        if settings.IS_WINDOWS:
+            signal_name = "itemDoubleClicked(QTreeWidgetItem *, int)"
+
+        self.connect(self, SIGNAL(signal_name), self._open_file)
         self.connect(self._fileWatcher, SIGNAL("fileChanged(int, QString)"),
             self._refresh_project_by_path)
         self.itemExpanded.connect(self._item_expanded)
@@ -335,6 +341,7 @@ class TreeProjectsWidget(QTreeWidget):
             self._refresh_project(prefresh)
 
     def _refresh_project_by_path(self, event, folder):
+        return
         if event not in (DELETED, ADDED, REMOVE, RENAME):
             return
         oprojects = self.get_open_projects()
@@ -375,7 +382,9 @@ class TreeProjectsWidget(QTreeWidget):
             if thread and not thread.isRunning():
                 paths_to_delete.append(path)
         for path in paths_to_delete:
-            self._thread_execution.pop(path, None)
+            thread = self._thread_execution.pop(path, None)
+            if thread:
+                thread.wait()
 
     def _callback_refresh_project(self, value):
         path, item, structure = value
@@ -383,6 +392,7 @@ class TreeProjectsWidget(QTreeWidget):
         self._load_folder(structure, path, item)
         #todo: refresh completion
         item.setExpanded(True)
+        self.emit(SIGNAL("projectPropertiesUpdated(QTreeWidgetItem)"), item)
 
     def _close_project(self):
         item = self.currentItem()
@@ -831,7 +841,8 @@ class FoldingContextMenu(QMenu):
     """
 
     def __init__(self, tree):
-        super(FoldingContextMenu, self).__init__(tree.tr("Fold/Unfold"))
+        super(FoldingContextMenu, self).__init__()
+        self.setTitle(self.tr("Fold/Unfold"))
         self._tree = tree
         fold_project = self.addAction(self.tr("Fold the project"))
         unfold_project = self.addAction(self.tr("Unfold the project"))

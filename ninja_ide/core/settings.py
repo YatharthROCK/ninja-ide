@@ -26,6 +26,9 @@ from ninja_ide.dependencies import pep8mod
 # OS DETECTOR
 ###############################################################################
 
+# Use this flags instead of sys.platform spreaded in the source code
+IS_WINDOWS = False
+
 OS_KEY = "Ctrl"
 
 FONT_FAMILY = 'Monospace'
@@ -40,6 +43,7 @@ if sys.platform == "darwin":
 elif sys.platform == "win32":
     FONT_FAMILY = 'Courier'
     FONT_SIZE = 10
+    IS_WINDOWS = True
 
 ###############################################################################
 # IDE
@@ -62,6 +66,7 @@ SHOW_START_PAGE = True
 CONFIRM_EXIT = True
 NOTIFY_UPDATES = True
 HIDE_TOOLBAR = False
+SHOW_STATUS_NOTIFICATIONS = True
 
 PYTHON_PATH = "python"
 EXECUTION_OPTIONS = ""
@@ -354,6 +359,7 @@ def load_settings():
     global BREAKPOINTS
     global BRACES
     global HIDE_TOOLBAR
+    global SHOW_STATUS_NOTIFICATIONS
     global TOOLBAR_ITEMS
     global SHOW_MINIMAP
     global MINIMAP_MAX_OPACITY
@@ -361,6 +367,8 @@ def load_settings():
     global SIZE_PROPORTION
     #General
     HIDE_TOOLBAR = qsettings.value("window/hide_toolbar", 'false') == 'true'
+    SHOW_STATUS_NOTIFICATIONS = qsettings.value(
+        "preferences/interface/showStatusNotifications", 'true') == 'true'
     TOOLBAR_AREA = int(qsettings.value('preferences/general/toolbarArea', 1))
     LANGUAGE = qsettings.value('preferences/interface/language', '')
     SHOW_START_PAGE = qsettings.value(
@@ -424,8 +432,8 @@ def load_settings():
         'preferences/editor/showTabsAndSpaces', 'true') == 'true'
     USE_TABS = qsettings.value('preferences/editor/useTabs', 'false') == 'true'
     if USE_TABS:
-        pep8mod.options.ignore.append("W191")
-        pep8mod.refresh_checks()
+        pep8mod_add_ignore("W191")
+        pep8mod_refresh_checks()
     ALLOW_WORD_WRAP = qsettings.value(
         'preferences/editor/allowWordWrap', 'false') == 'true'
     COMPLETE_DECLARATIONS = qsettings.value(

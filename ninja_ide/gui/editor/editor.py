@@ -60,6 +60,7 @@ from ninja_ide.gui.editor import pep8_checker
 from ninja_ide.gui.editor import errors_checker
 from ninja_ide.gui.editor import migration_2to3
 from ninja_ide.gui.editor import sidebar_widget
+from ninja_ide.gui.editor import python_syntax
 
 from ninja_ide.tools.logger import NinjaLogger
 
@@ -71,22 +72,6 @@ if sys.version_info.major == 3:
     python3 = True
 else:
     python3 = False
-
-
-scheme = {
-  "syntax_comment": dict(color="#80FF80", italic=True),
-  "syntax_string": "#B369BF",
-  "syntax_builtin": "#ee8859",
-  "syntax_keyword": ("#6EC7D7", True),
-  "syntax_definition": ("#F6EC2A", True),
-  "syntax_braces": "#FFFFFF",
-  "syntax_number": "#F8A008",
-  "syntax_proper_object": "#6EC7D7",
-  "syntax_operators": "#FFFFFF",
-  "syntax_spaces": "#7b7b7b",
-  "syntax_highlight_word": dict(color="red", background="blue"),
-}
-from ninja_ide.gui.editor import python_syntax
 
 
 class Editor(QPlainTextEdit, itab_item.ITabItem):
@@ -147,12 +132,7 @@ class Editor(QPlainTextEdit, itab_item.ITabItem):
         #Completer
         self.completer = completer_widget.CodeCompletionWidget(self)
         #Indentation
-        if project_obj is not None:
-            self.indent = project_obj.indentation
-            self.useTabs = project_obj.useTabs
-        else:
-            self.indent = settings.INDENT
-            self.useTabs = settings.USE_TABS
+        self.set_project(project_obj)
         #Flag to dont bug the user when answer *the modification dialog*
         self.ask_if_externally_modified = False
         self.just_saved = False
@@ -212,15 +192,26 @@ class Editor(QPlainTextEdit, itab_item.ITabItem):
             self._mini.show()
             self.connect(self, SIGNAL("updateRequest(const QRect&, int)"),
                 self._mini.update_visible_area)
-        #Set tab usage
-        if self.useTabs:
-            self.set_tab_usage()
 
         #Context Menu Options
         self.__actionFindOccurrences = QAction(
             self.tr("Find Usages"), self)
         self.connect(self.__actionFindOccurrences, SIGNAL("triggered()"),
             self._find_occurrences)
+
+    def set_project(self, project):
+        if project is not None:
+            self.indent = project.indentation
+            self.useTabs = project.useTabs
+            #Set tab usage
+            if self.useTabs:
+                self.set_tab_usage()
+            self.connect(project._parent,
+                SIGNAL("projectPropertiesUpdated(QTreeWidgetItem)"),
+                self.set_project)
+        else:
+            self.indent = settings.INDENT
+            self.useTabs = settings.USE_TABS
 
     def __get_encoding(self):
         """Get the current encoding of 'utf-8' otherwise."""
@@ -335,12 +326,14 @@ class Editor(QPlainTextEdit, itab_item.ITabItem):
             self._sync_tab_icon_notification_signal()
         else:
             self.syncDocErrorsSignal = True
+        self.pep8.wait()
 
     def show_migration_info(self):
         lines = list(self.migration.migration_data.keys())
         self._sidebarWidget.migration_lines(lines)
         self.highlighter.rehighlight_lines(lines)
         self.emit(SIGNAL("migrationAnalyzed()"))
+        self.migration.wait()
 
     def hide_pep8_errors(self):
         """Hide the pep8 errors from the sidebar and lines highlighted."""
@@ -356,6 +349,7 @@ class Editor(QPlainTextEdit, itab_item.ITabItem):
             self._sync_tab_icon_notification_signal()
         else:
             self.syncDocErrorsSignal = True
+        self.errors.wait()
 
     def hide_lint_errors(self):
         """Hide the lint errors from the sidebar and lines highlighted."""
@@ -385,26 +379,38 @@ class Editor(QPlainTextEdit, itab_item.ITabItem):
 
     def restyle(self, syntaxLang=None):
         self.apply_editor_style()
-        #if self.highlighter is None or isinstance(self.highlighter,
-           #highlighter.EmpyHighlighter):
-            #self.highlighter = highlighter.Highlighter(self.document(),
-                #None, resources.CUSTOM_SCHEME, self.errors, self.pep8,
-                #self.migration)
-        #if not syntaxLang:
-            #ext = file_manager.get_file_extension(self.ID)
-            #self.highlighter.apply_highlight(
-                #settings.EXTENSIONS.get(ext, 'python'),
-                #resources.CUSTOM_SCHEME)
-            #if self._mini:
-                #self._mini.highlighter.apply_highlight(
-                    #settings.EXTENSIONS.get(ext, 'python'),
-                    #resources.CUSTOM_SCHEME)
-        #else:
-            #self.highlighter.apply_highlight(
-                #syntaxLang, resources.CUSTOM_SCHEME)
-            #if self._mini:
-                #self._mini.highlighter.apply_highlight(
-                    #syntaxLang, resources.CUSTOM_SCHEME)
+        if self.lang == 'python':
+            parts_scanner, code_scanner, formats = \
+                syntax_highlighter.load_syntax(python_syntax.syntax)
+            self.highlighter = syntax_highlighter.SyntaxHighlighter(
+                self.document(),
+                parts_scanner, code_scanner, formats,
+                errors=self.errors, pep8=self.pep8, migration=self.migration)
+            if self._mini:
+                self._mini.highlighter = syntax_highlighter.SyntaxHighlighter(
+                    self._mini.document(), parts_scanner,
+                    code_scanner, formats)
+            return
+        if self.highlighter is None or isinstance(self.highlighter,
+           highlighter.EmpyHighlighter):
+            self.highlighter = highlighter.Highlighter(self.document(),
+                None, resources.CUSTOM_SCHEME, self.errors, self.pep8,
+                self.migration)
+        if not syntaxLang:
+            ext = file_manager.get_file_extension(self.ID)
+            self.highlighter.apply_highlight(
+                settings.EXTENSIONS.get(ext, 'python'),
+                resources.CUSTOM_SCHEME)
+            if self._mini:
+                self._mini.highlighter.apply_highlight(
+                    settings.EXTENSIONS.get(ext, 'python'),
+                    resources.CUSTOM_SCHEME)
+        else:
+            self.highlighter.apply_highlight(
+                syntaxLang, resources.CUSTOM_SCHEME)
+            if self._mini:
+                self._mini.highlighter.apply_highlight(
+                    syntaxLang, resources.CUSTOM_SCHEME)
 
     def apply_editor_style(self):
         css = 'QPlainTextEdit {color: %s; background-color: %s;' \
@@ -430,8 +436,7 @@ class Editor(QPlainTextEdit, itab_item.ITabItem):
         self.lang = settings.EXTENSIONS.get(lang, 'python')
         if self.lang == 'python':
             parts_scanner, code_scanner, formats = \
-                syntax_highlighter.load_syntax(
-                    python_syntax.syntax, scheme)
+                syntax_highlighter.load_syntax(python_syntax.syntax)
             self.highlighter = syntax_highlighter.SyntaxHighlighter(
                 self.document(),
                 parts_scanner, code_scanner, formats,
@@ -480,23 +485,21 @@ class Editor(QPlainTextEdit, itab_item.ITabItem):
         inside = False
         cursor = self.textCursor()
         pos = cursor.positionInBlock()
-        user_data = cursor.block().userData()
-        if user_data is not None:
-            for vals in user_data.str_groups:
-                if vals[0] < pos < vals[1]:
-                    inside = True
-                    break
+        user_data = syntax_highlighter.get_user_data(cursor.block())
+        for vals in user_data.str_groups:
+            if vals[0] < pos < vals[1]:
+                inside = True
+                break
         return inside
 
     def cursor_inside_comment(self):
         inside = False
         cursor = self.textCursor()
         pos = cursor.positionInBlock()
-        user_data = cursor.block().userData()
-        if user_data is not None:
-            if (user_data.comment_start != -1) and \
-               (pos > user_data.comment_start):
-                inside = True
+        user_data = syntax_highlighter.get_user_data(cursor.block())
+        if (user_data.comment_start != -1) and \
+           (pos > user_data.comment_start):
+            inside = True
         return inside
 
     def set_font(self, family=settings.FONT_FAMILY, size=settings.FONT_SIZE):
@@ -857,13 +860,17 @@ class Editor(QPlainTextEdit, itab_item.ITabItem):
 
     def complete_declaration(self):
         settings.COMPLETE_DECLARATIONS = not settings.COMPLETE_DECLARATIONS
-        cursor = self.textCursor()
-        cursor.movePosition(QTextCursor.EndOfLine)
-        if cursor.atEnd():
-            cursor.insertBlock()
-        self.moveCursor(QTextCursor.Down)
-        self.__auto_indent(None)
+        self.insert_new_line()
         settings.COMPLETE_DECLARATIONS = not settings.COMPLETE_DECLARATIONS
+
+    def insert_new_line(self):
+        cursor = self.textCursor()
+        at_block_end = cursor.atBlockEnd()
+        cursor.movePosition(QTextCursor.EndOfLine)
+        cursor.insertBlock()
+        if not at_block_end:
+            self.moveCursor(QTextCursor.Down)
+        self.__auto_indent(None)
 
     def __complete_braces(self, event):
         """Complete () [] and {} using a mild inteligence to see if corresponds
@@ -1021,10 +1028,12 @@ class Editor(QPlainTextEdit, itab_item.ITabItem):
             QToolTip.showText(self.mapToGlobal(position), message, self)
         if event.modifiers() == Qt.ControlModifier:
             cursor.select(QTextCursor.WordUnderCursor)
-            cursor.movePosition(QTextCursor.Right, QTextCursor.KeepAnchor)
-            if cursor.selectedText().endswith('(') or \
-            cursor.selectedText().endswith('.'):
-                cursor.movePosition(QTextCursor.Left, QTextCursor.KeepAnchor)
+            selection_start = cursor.selectionStart()
+            selection_end = cursor.selectionEnd()
+            cursor.setPosition(selection_start - 1)
+            cursor.setPosition(selection_end + 1, QTextCursor.KeepAnchor)
+            if cursor.selectedText()[-1:] in ('(', '.') or \
+            cursor.selectedText()[:1] in ('.', '@'):
                 self.extraSelections = []
                 selection = QTextEdit.ExtraSelection()
                 lineColor = QColor(resources.CUSTOM_SCHEME.get('linkNavigate',
@@ -1070,13 +1079,20 @@ class Editor(QPlainTextEdit, itab_item.ITabItem):
         if not cursor:
             cursor = self.textCursor()
         cursor.select(QTextCursor.WordUnderCursor)
-        cursor.movePosition(QTextCursor.Right, QTextCursor.KeepAnchor)
-        if cursor.selectedText().endswith('('):
-            cursor.movePosition(QTextCursor.Left, QTextCursor.KeepAnchor)
+        selection_start = cursor.selectionStart()
+        selection_end = cursor.selectionEnd()
+        cursor.setPosition(selection_start - 1)
+        cursor.setPosition(selection_end + 1, QTextCursor.KeepAnchor)
+        if cursor.selectedText().endswith('(') or \
+           cursor.selectedText().startswith('@'):
+            cursor.setPosition(selection_start)
+            cursor.setPosition(selection_end, QTextCursor.KeepAnchor)
             self.emit(SIGNAL("locateFunction(QString, QString, bool)"),
                 cursor.selectedText(), self.ID, False)
-        elif cursor.selectedText().endswith('.'):
-            cursor.movePosition(QTextCursor.Left, QTextCursor.KeepAnchor)
+        elif cursor.selectedText().endswith('.') or \
+             cursor.selectedText().startswith('.'):
+            cursor.setPosition(selection_start)
+            cursor.setPosition(selection_end, QTextCursor.KeepAnchor)
             self.emit(SIGNAL("locateFunction(QString, QString, bool)"),
                 cursor.selectedText(), self.ID, True)
 

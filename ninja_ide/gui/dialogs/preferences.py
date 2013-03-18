@@ -452,11 +452,14 @@ class InterfaceTab(QWidget):
         self._checkWebInspetor = QCheckBox(self.tr("Show Web Inspector."))
         self._checkFileErrors = QCheckBox(self.tr("Show File Errors."))
         self._checkMigrationTips = QCheckBox(self.tr("Show Migration Tips."))
+        self._checkStatusBarNotifications = QCheckBox(
+            self.tr("Show Status Bar Notifications."))
         vboxExplorer.addWidget(self._checkProjectExplorer)
         vboxExplorer.addWidget(self._checkSymbols)
         vboxExplorer.addWidget(self._checkWebInspetor)
         vboxExplorer.addWidget(self._checkFileErrors)
         vboxExplorer.addWidget(self._checkMigrationTips)
+        vboxExplorer.addWidget(self._checkStatusBarNotifications)
         #GUI
         self._btnCentralRotate = QPushButton(
             QIcon(resources.IMAGES['splitCPosition']), '')
@@ -527,6 +530,8 @@ class InterfaceTab(QWidget):
         self._checkWebInspetor.setChecked(settings.SHOW_WEB_INSPECTOR)
         self._checkFileErrors.setChecked(settings.SHOW_ERRORS_LIST)
         self._checkMigrationTips.setChecked(settings.SHOW_MIGRATION_LIST)
+        self._checkStatusBarNotifications.setChecked(
+            settings.SHOW_STATUS_NOTIFICATIONS)
         #ui layout
         self._btnCentralRotate.setChecked(bin(settings.UI_LAYOUT)[-1] == '1')
         self._btnPanelsRotate.setChecked(bin(
@@ -586,63 +591,73 @@ class InterfaceTab(QWidget):
         self.toolbar_items = {
             'separator': [QIcon(resources.IMAGES['separator']),
                 'Add Separtor'],
-            'new-file': [QIcon(resources.IMAGES['new']), 'New File'],
-            'new-project': [QIcon(resources.IMAGES['newProj']), 'New Project'],
-            'save-file': [QIcon(resources.IMAGES['save']), 'Save File'],
-            'save-as': [QIcon(resources.IMAGES['saveAs']), 'Save As'],
-            'save-all': [QIcon(resources.IMAGES['saveAll']), 'Save All'],
+            'new-file': [QIcon(resources.IMAGES['new']), self.tr('New File')],
+            'new-project': [QIcon(resources.IMAGES['newProj']),
+                self.tr('New Project')],
+            'save-file': [QIcon(resources.IMAGES['save']),
+                self.tr('Save File')],
+            'save-as': [QIcon(resources.IMAGES['saveAs']), self.tr('Save As')],
+            'save-all': [QIcon(resources.IMAGES['saveAll']),
+                self.tr('Save All')],
             'save-project': [QIcon(resources.IMAGES['saveAll']),
-                'Save Project'],
+                self.tr('Save Project')],
             'reload-file': [QIcon(resources.IMAGES['reload-file']),
-                'Reload File'],
-            'open-file': [QIcon(resources.IMAGES['open']), 'Open File'],
+                self.tr('Reload File')],
+            'open-file': [QIcon(resources.IMAGES['open']),
+                self.tr('Open File')],
             'open-project': [QIcon(resources.IMAGES['openProj']),
-                'Open Project'],
+                self.tr('Open Project')],
             'activate-profile': [QIcon(resources.IMAGES['activate-profile']),
-                'Activate Profile'],
+                self.tr('Activate Profile')],
             'deactivate-profile':
                 [QIcon(resources.IMAGES['deactivate-profile']),
-                'Deactivate Profile'],
-            'print-file': [QIcon(resources.IMAGES['print']), 'Print File'],
+                self.tr('Deactivate Profile')],
+            'print-file': [QIcon(resources.IMAGES['print']),
+                self.tr('Print File')],
             'close-file':
                 [self.style().standardIcon(QStyle.SP_DialogCloseButton),
-                'Close File'],
+                self.tr('Close File')],
             'close-projects':
                 [self.style().standardIcon(QStyle.SP_DialogCloseButton),
-                'Close Projects'],
-            'undo': [QIcon(resources.IMAGES['undo']), 'Undo'],
-            'redo': [QIcon(resources.IMAGES['redo']), 'Redo'],
-            'cut': [QIcon(resources.IMAGES['cut']), 'Cut'],
-            'copy': [QIcon(resources.IMAGES['copy']), 'Copy'],
-            'paste': [QIcon(resources.IMAGES['paste']), 'Paste'],
-            'find': [QIcon(resources.IMAGES['find']), 'Find'],
+                self.tr('Close Projects')],
+            'undo': [QIcon(resources.IMAGES['undo']), self.tr('Undo')],
+            'redo': [QIcon(resources.IMAGES['redo']), self.tr('Redo')],
+            'cut': [QIcon(resources.IMAGES['cut']), self.tr('Cut')],
+            'copy': [QIcon(resources.IMAGES['copy']), self.tr('Copy')],
+            'paste': [QIcon(resources.IMAGES['paste']), self.tr('Paste')],
+            'find': [QIcon(resources.IMAGES['find']), self.tr('Find')],
             'find-replace': [QIcon(resources.IMAGES['findReplace']),
-                'Find/Replace'],
-            'find-files': [QIcon(resources.IMAGES['find']), 'Find In files'],
+                self.tr('Find/Replace')],
+            'find-files': [QIcon(resources.IMAGES['find']),
+                self.tr('Find In files')],
             'code-locator': [QIcon(resources.IMAGES['locator']),
-                'Code Locator'],
+                self.tr('Code Locator')],
             'splith': [QIcon(resources.IMAGES['splitH']),
-                'Split Horizontally'],
-            'splitv': [QIcon(resources.IMAGES['splitV']), 'Split Vertically'],
-            'follow-mode': [QIcon(resources.IMAGES['follow']), 'Follow Mode'],
-            'zoom-in': [QIcon(resources.IMAGES['zoom-in']), 'Zoom In'],
-            'zoom-out': [QIcon(resources.IMAGES['zoom-out']), 'Zoom Out'],
+                self.tr('Split Horizontally')],
+            'splitv': [QIcon(resources.IMAGES['splitV']),
+                self.tr('Split Vertically')],
+            'follow-mode': [QIcon(resources.IMAGES['follow']),
+                self.tr('Follow Mode')],
+            'zoom-in': [QIcon(resources.IMAGES['zoom-in']), self.tr('Zoom In')],
+            'zoom-out': [QIcon(resources.IMAGES['zoom-out']),
+                self.tr('Zoom Out')],
             'indent-more': [QIcon(resources.IMAGES['indent-more']),
-                'Indent More'],
+                self.tr('Indent More')],
             'indent-less': [QIcon(resources.IMAGES['indent-less']),
-                'Indent Less'],
-            'comment': [QIcon(resources.IMAGES['comment-code']), 'Comment'],
+                self.tr('Indent Less')],
+            'comment': [QIcon(resources.IMAGES['comment-code']),
+                self.tr('Comment')],
             'uncomment': [QIcon(resources.IMAGES['uncomment-code']),
-                'Uncomment'],
+                self.tr('Uncomment')],
             'go-to-definition': [QIcon(resources.IMAGES['go-to-definition']),
-                'Go To Definition'],
+                self.tr('Go To Definition')],
             'insert-import': [QIcon(resources.IMAGES['insert-import']),
-                'Insert Import'],
+                self.tr('Insert Import')],
             'run-project': [QIcon(resources.IMAGES['play']), 'Run Project'],
             'run-file': [QIcon(resources.IMAGES['file-run']), 'Run File'],
             'stop': [QIcon(resources.IMAGES['stop']), 'Stop'],
             'preview-web': [QIcon(resources.IMAGES['preview-web']),
-                'Preview Web']}
+                self.tr('Preview Web')]}
         for item in self.toolbar_items:
             combo.addItem(self.toolbar_items[item][0],
                 self.toolbar_items[item][1], item)
@@ -722,6 +737,10 @@ class InterfaceTab(QWidget):
             explorer_container.ExplorerContainer().add_tab_migration()
         else:
             explorer_container.ExplorerContainer().remove_tab_migration()
+        qsettings.setValue('showStatusNotifications',
+            self._checkStatusBarNotifications.isChecked())
+        settings.SHOW_STATUS_NOTIFICATIONS = \
+            self._checkStatusBarNotifications.isChecked()
         #ui layout
         uiLayout = 1 if self._btnCentralRotate.isChecked() else 0
         uiLayout += 2 if self._btnPanelsRotate.isChecked() else 0
@@ -872,6 +891,7 @@ class EditorGeneral(QWidget):
             self._listScheme.setCurrentItem(items[0])
         else:
             self._listScheme.setCurrentRow(0)
+        self.thread_callback.wait()
 
     def hideEvent(self, event):
         super(EditorGeneral, self).hideEvent(event)
@@ -1723,8 +1743,8 @@ class ThemeTab(QTabWidget):
         self.theme_chooser = ThemeChooser()
         self.theme_designer = ThemeDesigner(self)
 
-        self.addTab(self.theme_chooser, "Theme Chooser")
-        self.addTab(self.theme_designer, "Theme Designer")
+        self.addTab(self.theme_chooser, self.tr("Theme Chooser"))
+        self.addTab(self.theme_designer, self.tr("Theme Designer"))
 
     def save(self):
         self.theme_chooser.save()
